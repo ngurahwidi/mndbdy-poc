@@ -7,7 +7,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.CHANGEME.mndbdypoc",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "We read your heart rate, HRV, and sleep data to recommend a suitable session each morning.",
+        "NSHealthUpdateUsageDescription": "We save your completed sessions to Apple Health."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,6 +25,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "We read your heart rate, HRV, and sleep data to recommend a suitable session each morning.",
+          "NSHealthUpdateUsageDescription": "We save your completed sessions to Apple Health.",
+          "background": false
+        }
+      ]
+    ]
   }
 }
