@@ -5,7 +5,12 @@
  * implementation must never import anything iOS-specific.
  */
 
-import type { HealthProvider, HealthSample, SleepSummary } from './types'
+import type {
+  HealthProvider,
+  HealthSample,
+  SleepSummary,
+  StepsSummary,
+} from './types'
 
 const SOURCE = 'Mock Data'
 
@@ -76,6 +81,19 @@ class MockHealthProvider implements HealthProvider {
     return buildSamples(limit, 'ms', 60, () => randomBetween(30, 60))
   }
 
+  async saveTestSleepSample(minutes = 5): Promise<void> {
+    await simulateLatency()
+    // No local store to write into — the mock's getSleep already returns
+    // random data every call, so there is nothing to append this to.
+    void minutes
+  }
+
+  async saveHeartRateSample(bpm: number): Promise<void> {
+    await simulateLatency()
+    // No local store to write into — same reasoning as saveTestSleepSample.
+    void bpm
+  }
+
   async getSleep(days = 7): Promise<SleepSummary[]> {
     await simulateLatency()
 
@@ -87,6 +105,22 @@ class MockHealthProvider implements HealthProvider {
         date: toDayKey(day),
         // 6–8 hours a night.
         totalMinutes: Math.round(randomBetween(360, 480)),
+        source: SOURCE,
+      }
+    })
+  }
+
+  async getSteps(days = 7): Promise<StepsSummary[]> {
+    await simulateLatency()
+
+    const now = new Date()
+    return Array.from({ length: days }, (_, index) => {
+      const day = new Date(now)
+      day.setDate(day.getDate() - index)
+      return {
+        date: toDayKey(day),
+        // 3k–12k steps a day.
+        totalSteps: Math.round(randomBetween(3_000, 12_000)),
         source: SOURCE,
       }
     })

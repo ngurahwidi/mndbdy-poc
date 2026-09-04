@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.CHANGEME.mndbdypoc",
+      "bundleIdentifier": "com.widi.mndbdypoc",
       "infoPlist": {
         "NSHealthShareUsageDescription": "We read your heart rate, HRV, and sleep data to recommend a suitable session each morning.",
         "NSHealthUpdateUsageDescription": "We save your completed sessions to Apple Health."

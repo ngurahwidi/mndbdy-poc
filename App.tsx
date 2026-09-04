@@ -1,10 +1,12 @@
 import { StatusBar } from 'expo-status-bar'
+import { useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 
@@ -75,8 +77,20 @@ function Section({
 }
 
 export default function App() {
-  const { ready, loading, heartRate, hrv, sleep, log, init, load } =
-    useHealthData()
+  const {
+    ready,
+    loading,
+    heartRate,
+    hrv,
+    sleep,
+    steps,
+    log,
+    init,
+    load,
+    save,
+    saveHeartRate,
+  } = useHealthData()
+  const [bpmInput, setBpmInput] = useState('')
 
   return (
     <View style={styles.root}>
@@ -104,7 +118,34 @@ export default function App() {
             onPress={() => void load()}
             disabled={!ready || loading}
           />
+          <Button
+            label="3. Save test sleep sample"
+            onPress={() => void save()}
+            disabled={!ready || loading}
+          />
         </View>
+
+        <Section title="Save heart rate">
+          <Text style={styles.fieldLabel}>Date & time</Text>
+          <Text style={styles.fieldValue}>{new Date().toLocaleString()}</Text>
+          <Text style={styles.fieldLabel}>BPM</Text>
+          <TextInput
+            style={styles.input}
+            value={bpmInput}
+            onChangeText={setBpmInput}
+            placeholder="e.g. 72"
+            keyboardType="number-pad"
+            editable={ready && !loading}
+          />
+          <Button
+            label="4. Save heart rate now"
+            onPress={() => {
+              void saveHeartRate(Number(bpmInput))
+              setBpmInput('')
+            }}
+            disabled={!ready || loading || bpmInput.trim().length === 0}
+          />
+        </Section>
 
         {loading ? (
           <View style={styles.loadingRow}>
@@ -137,6 +178,22 @@ export default function App() {
                   {formatDuration(night.totalMinutes)}
                 </Text>
                 <Text style={styles.rowSource}>{night.source}</Text>
+              </View>
+            ))
+          )}
+        </Section>
+
+        <Section title="Steps — last 7 days">
+          {steps.length === 0 ? (
+            <Text style={styles.empty}>No data</Text>
+          ) : (
+            steps.slice(0, 7).map((day) => (
+              <View key={day.date} style={styles.row}>
+                <Text style={styles.rowPrimary}>{day.date}</Text>
+                <Text style={styles.rowValue}>
+                  {day.totalSteps.toLocaleString()} steps
+                </Text>
+                <Text style={styles.rowSource}>{day.source}</Text>
               </View>
             ))
           )}
@@ -214,6 +271,18 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 11, color: '#999' },
   section: { backgroundColor: '#fff', borderRadius: 10, padding: 12, gap: 6 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111' },
+  fieldLabel: { fontSize: 12, color: '#666' },
+  fieldValue: { fontSize: 14, color: '#111', marginBottom: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d0d2d6',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 15,
+    color: '#111',
+    marginBottom: 4,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowPrimary: { width: 96, fontSize: 13, color: '#111' },
   rowValue: { width: 110, fontSize: 13, fontWeight: '600', color: '#111' },

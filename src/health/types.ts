@@ -25,6 +25,13 @@ export type SleepSummary = {
   source: string
 }
 
+export type StepsSummary = {
+  /** YYYY-MM-DD */
+  date: string
+  totalSteps: number
+  source: string
+}
+
 export interface HealthProvider {
   readonly name: string
   isAvailable(): Promise<boolean>
@@ -32,4 +39,16 @@ export interface HealthProvider {
   getHeartRate(limit?: number): Promise<HealthSample[]>
   getHRV(limit?: number): Promise<HealthSample[]>
   getSleep(days?: number): Promise<SleepSummary[]>
+  getSteps(days?: number): Promise<StepsSummary[]>
+  /**
+   * Writes a short "asleep" sample ending now, `minutes` long. Exists to
+   * validate the write side of HealthKit — call `getSleep` afterwards to
+   * confirm it round-trips.
+   */
+  saveTestSleepSample(minutes?: number): Promise<void>
+  /**
+   * Writes a single instantaneous heart rate reading (`bpm`) timestamped now
+   * — mirrors the "Add Data" flow in the Health app's Heart Rate screen.
+   */
+  saveHeartRateSample(bpm: number): Promise<void>
 }

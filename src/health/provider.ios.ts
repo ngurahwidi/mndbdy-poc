@@ -17,6 +17,8 @@ import {
   queryCategorySamples,
   queryQuantitySamples,
   requestAuthorization,
+  saveCategorySample,
+  saveQuantitySample,
 } from '@kingstinct/react-native-healthkit'
 import type {
   CategorySampleTyped,
@@ -24,11 +26,17 @@ import type {
   QuantitySampleTyped,
 } from '@kingstinct/react-native-healthkit'
 
-import type { HealthProvider, HealthSample, SleepSummary } from './types'
+import type {
+  HealthProvider,
+  HealthSample,
+  SleepSummary,
+  StepsSummary,
+} from './types'
 
 const HEART_RATE = 'HKQuantityTypeIdentifierHeartRate' as const
 const HRV_SDNN = 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN' as const
 const SLEEP_ANALYSIS = 'HKCategoryTypeIdentifierSleepAnalysis' as const
+const STEP_COUNT = 'HKQuantityTypeIdentifierStepCount' as const
 
 /**
  * NOTE: the library's canonical unit for heart rate is 'count/s', NOT
@@ -42,11 +50,13 @@ const SLEEP_ANALYSIS = 'HKCategoryTypeIdentifierSleepAnalysis' as const
  */
 const HEART_RATE_UNIT = 'count/min' as const
 const HRV_UNIT = 'ms' as const
+const STEP_COUNT_UNIT = 'count' as const
 
 const READ_TYPES: readonly ObjectTypeIdentifier[] = [
   HEART_RATE,
   HRV_SDNN,
   SLEEP_ANALYSIS,
+  STEP_COUNT,
 ]
 
 /**
@@ -76,18 +86,21 @@ const fail = (operation: string, cause: unknown): never => {
  * third-party app name) off a sample. This is how Apple Watch data is told
  * apart from manual entries, so it must not be dropped.
  *
- * `sourceRevision.source` is a Nitro HybridObject whose `name` is a native
- * property getter, so the access is defensive.
- *
- * TODO(mac): verify on device that `sourceRevision.source.name` is readable
- * for every sample and does not throw for a released/invalidated proxy. If it
- * does throw, switch to `sourceRevision.source.toJSON().name`.
+ * `sourceRevision.source` is a Nitro HybridObject (`SourceProxy`), and every
+ * HybridObject has its own built-in `name` (the native binding's type name,
+ * e.g. "SourceProxy" — see HybridObject.d.ts). That shadows `Source.name`
+ * (the actual HealthKit source name) declared on the same interface, so
+ * `.source.name` always resolves to the class name, never the real source.
+ * `.toJSON()` returns a plain `Source` object instead of the proxy, which
+ * sidesteps the collision.
  */
 const readSourceName = (sample: {
-  readonly sourceRevision?: { readonly source?: { readonly name?: string } }
+  readonly sourceRevision?: {
+    readonly source?: { readonly toJSON?: () => { readonly name?: string } }
+  }
 }): string => {
   try {
-    const name = sample.sourceRevision?.source?.name
+    const name = sample.sourceRevision?.source?.toJSON?.()?.name
     return typeof name === 'string' && name.length > 0 ? name : 'Unknown'
   } catch {
     return 'Unknown'
@@ -155,6 +168,35 @@ const summariseSleep = (
   })).sort((a, b) => b.date.localeCompare(a.date))
 }
 
+type StepsBucket = { steps: number; sources: Set<string> }
+
+/**
+ * HealthKit stores step count as many short interval samples throughout the
+ * day (per source, per few minutes), so they are grouped and summed.
+ *
+ * Bucketed by the interval's *start* day — unlike sleep, step intervals are
+ * effectively never recorded across a midnight boundary.
+ */
+const summariseSteps = (
+  samples: readonly QuantitySampleTyped<typeof STEP_COUNT>[],
+): StepsSummary[] => {
+  const buckets = new Map<string, StepsBucket>()
+
+  for (const sample of samples) {
+    const key = toDayKey(sample.startDate)
+    const bucket = buckets.get(key) ?? { steps: 0, sources: new Set<string>() }
+    bucket.steps += sample.quantity
+    bucket.sources.add(readSourceName(sample))
+    buckets.set(key, bucket)
+  }
+
+  return Array.from(buckets, ([date, bucket]) => ({
+    date,
+    totalSteps: Math.round(bucket.steps),
+    source: bucket.sources.size > 0 ? [...bucket.sources].join(', ') : 'Unknown',
+  })).sort((a, b) => b.date.localeCompare(a.date))
+}
+
 class HealthKitProvider implements HealthProvider {
   readonly name = 'healthkit'
 
@@ -186,10 +228,24 @@ class HealthKitProvider implements HealthProvider {
         toRead: READ_TYPES,
         // Declared so NSHealthUpdateUsageDescription is exercised and writing
         // completed sessions later does not need a second prompt.
-        toShare: [SLEEP_ANALYSIS],
+        toShare: [SLEEP_ANALYSIS, HEART_RATE],
       })
     } catch (cause) {
       fail('authorization request', cause)
+    }
+  }
+
+  /**
+   * Writes a single instantaneous heart rate reading, timestamped now —
+   * start and end are the same instant, matching how a manual "Add Data"
+   * entry works in the Health app's Heart Rate screen.
+   */
+  async saveHeartRateSample(bpm: number): Promise<void> {
+    try {
+      const now = new Date()
+      await saveQuantitySample(HEART_RATE, HEART_RATE_UNIT, bpm, now, now)
+    } catch (cause) {
+      fail('heart rate sample save', cause)
     }
   }
 
@@ -219,6 +275,26 @@ class HealthKitProvider implements HealthProvider {
     }
   }
 
+  /**
+   * Writes a test "asleep" sample, `minutes` long, ending now. Validates the
+   * write side of HealthKit — this type is already declared in `toShare`
+   * above, so no extra authorization prompt is needed.
+   */
+  async saveTestSleepSample(minutes = 5): Promise<void> {
+    try {
+      const end = new Date()
+      const start = new Date(end.getTime() - minutes * 60_000)
+      await saveCategorySample(
+        SLEEP_ANALYSIS,
+        CategoryValueSleepAnalysis.asleepCore,
+        start,
+        end,
+      )
+    } catch (cause) {
+      fail('sleep sample save', cause)
+    }
+  }
+
   async getSleep(days = 7): Promise<SleepSummary[]> {
     try {
       // One extra day of lookback so a night that started before the window
@@ -237,6 +313,20 @@ class HealthKitProvider implements HealthProvider {
       return summariseSleep(samples).slice(0, days)
     } catch (cause) {
       return fail('sleep query', cause)
+    }
+  }
+
+  async getSteps(days = 7): Promise<StepsSummary[]> {
+    try {
+      const samples = await queryQuantitySamples(STEP_COUNT, {
+        limit: -1,
+        ascending: false,
+        unit: STEP_COUNT_UNIT,
+        filter: { date: { startDate: startOfDaysAgo(days) } },
+      })
+      return summariseSteps(samples).slice(0, days)
+    } catch (cause) {
+      return fail('steps query', cause)
     }
   }
 }
