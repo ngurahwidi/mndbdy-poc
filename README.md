@@ -51,18 +51,75 @@ Requires Xcode 26.4+ and a physical iPhone — the simulator has no real Health
 data (you can hand-add samples in the Health app on a simulator, but Apple
 Watch–sourced data will not be there).
 
+### 1. Install JS dependencies
+
 ```bash
-git pull
+cd mndbdy-poc
 npm install
+```
 
-# Set a real bundle identifier first — app.json still says com.CHANGEME.*
+### 2. Set a real bundle identifier
+
+`app.json` still says `"com.CHANGEME.mndbdypoc"`. Replace it with a real
+identifier (e.g. `com.yourname.mndbdypoc`) **before** prebuilding — Xcode uses
+it for signing.
+
+### 3. Generate the native iOS project
+
+```bash
 npx expo prebuild --clean --platform ios
+```
 
+This generates the `ios/` folder (deliberately not committed — see
+`.gitignore`). The HealthKit config plugin automatically adds the
+`com.apple.developer.healthkit` entitlement and the two `Info.plist` usage
+descriptions, so there is nothing to add by hand in Xcode (more on this
+below).
+
+### 4. Open the project in Xcode
+
+```bash
+open ios/mndbdypoc.xcworkspace
+```
+
+Open the `.xcworkspace` file, **not** `.xcodeproj` — CocoaPods is used.
+
+### 5. Set up signing & device in Xcode
+
+- Select the project root in the navigator → target **mndbdypoc** →
+  **Signing & Capabilities** tab.
+- Pick your **Team** (your Apple ID / developer account).
+- Connect your iPhone (cable or same Wi-Fi network) and select it in the
+  device selector next to the Run button.
+- Make sure **Settings → Privacy & Security → Developer Mode** is enabled on
+  the iPhone (only needed the first time it's used for development).
+
+### 6. Build & run
+
+Press **▶ (Cmd+R)** in Xcode. Or, from the terminal, without opening Xcode
+manually:
+
+```bash
 npx expo run:ios --device
 ```
 
-Then on the device: tap **Init & request permissions**, grant heart rate, HRV
-and sleep in the sheet, then tap **Load data**.
+### 7. Test on the device
+
+Once the app opens on the iPhone:
+
+1. Tap **Init & request permissions** — grant heart rate, HRV and sleep in
+   the sheet that appears.
+2. Tap **Load data** (only enabled once step 1 finishes).
+
+### Things that will bite you
+
+- Never query HealthKit before requesting authorization — that **crashes**
+  the app, it does not throw a catchable error.
+- `expo prebuild --clean` wipes any manual changes made in Xcode — configure
+  through `app.json` / the config plugin, never edit Xcode project settings
+  directly.
+- Don't commit `ios/` or `android/` — see
+  [Do not commit `ios/` or `android/`](#do-not-commit-ios-or-android) below.
 
 ### About the entitlement
 
@@ -94,8 +151,14 @@ durations. Attributing to the end day means sleep from 23:30 Monday to 07:00
 Tuesday counts as Tuesday's — which is what a morning session needs.
 
 **Source names are preserved.** Every sample carries `source` (e.g. "Apple
-Watch", "iPhone", a third-party app), read from `sourceRevision.source.name`.
-This is how Apple Watch data is told apart from manual entries.
+Watch", "iPhone", a third-party app), read from
+`sourceRevision.source.toJSON().name`. Plain `sourceRevision.source.name`
+does **not** work — every Nitro `HybridObject` (which `source` is one of)
+has its own built-in `name` describing the native binding's type (it reads
+back as the literal string `"SourceProxy"`), and that shadows the
+domain-specific `Source.name` declared on the same interface. `toJSON()`
+returns a plain object instead of the proxy, sidestepping the collision. This
+is how Apple Watch data is told apart from manual entries.
 
 ## Do not commit `ios/` or `android/`
 
