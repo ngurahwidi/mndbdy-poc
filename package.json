@@ -4,11 +4,13 @@
   "main": "index.ts",
   "dependencies": {
     "@kingstinct/react-native-healthkit": "^14.1.0",
+    "@react-native-community/datetimepicker": "9.1.0",
     "expo": "~57.0.19",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-ios-alarmkit": "^0.7.6",
     "react-native-nitro-modules": "^0.37.1",
     "react-native-web": "^0.21.2"
   },

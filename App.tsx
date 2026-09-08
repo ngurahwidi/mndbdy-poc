@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native'
 
+import { AlarmSection } from './src/components/AlarmSection'
 import { provider } from './src/health'
 import type { HealthSample } from './src/health'
 import { useHealthData } from './src/hooks/useHealthData'
@@ -97,15 +98,19 @@ export default function App() {
       <StatusBar style="auto" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>MNDBDY HealthKit PoC</Text>
+          <Text style={styles.title}>MNDBDY PoC</Text>
           <Text style={styles.providerLine}>
-            provider: <Text style={styles.providerName}>{provider.name}</Text>
+            health provider:{' '}
+            <Text style={styles.providerName}>{provider.name}</Text>
           </Text>
           <Text style={styles.status}>
             {ready ? 'initialized' : 'not initialized'}
             {loading ? ' · working…' : ''}
           </Text>
         </View>
+
+        {/* Independent of the HealthKit flow below — it needs no init step. */}
+        <AlarmSection />
 
         <View style={styles.buttonRow}>
           <Button
