@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.widi.mndbdypoc",
       "infoPlist": {
         "NSHealthShareUsageDescription": "We read your heart rate, HRV, and sleep data to recommend a suitable session each morning.",
-        "NSHealthUpdateUsageDescription": "We save your completed sessions to Apple Health."
+        "NSHealthUpdateUsageDescription": "We save your completed sessions to Apple Health.",
+        "NSAlarmKitUsageDescription": "We schedule an alarm so your session starts at the time you picked."
       }
     },
     "android": {
@@ -34,7 +35,8 @@
           "NSHealthUpdateUsageDescription": "We save your completed sessions to Apple Health.",
           "background": false
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }
